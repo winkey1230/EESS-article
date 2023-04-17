@@ -11,6 +11,7 @@
 #' @param ncore A integer referring to the number of cores for parallel computation.
 MMSatScan <- function(id,geo,value,slist,maxsize = NULL,mcmc = 99,replica = F,ncore = 4){
   if(is.null(maxsize)) maxsize <- 0.5
+  #mvrnorm <- MASS::mvrnorm
   n <- length(id)
   maxn <- floor(n*maxsize)
   ins <- lapply(slist, function(x) chol2inv(chol(x))) # the inverse matrix of s
@@ -27,6 +28,10 @@ MMSatScan <- function(id,geo,value,slist,maxsize = NULL,mcmc = 99,replica = F,nc
     -sum(aa)
   }
   
+  # under H0
+  # beta0 <- metabeta(value,ins)
+  
+  
   distance <- as.matrix(dist(geo,diag = T,method = "euclidean"))
   idname <- row.names(distance)
   
@@ -42,12 +47,12 @@ MMSatScan <- function(id,geo,value,slist,maxsize = NULL,mcmc = 99,replica = F,nc
       id1 <- idj[1:k] # id in cluster
       id2 <- idj[-(1:k)] # id not in cluster
       if(k==1) ll1 <- 0 else{
-        beta1 <- metabeta(value[id1,],blist = ins[id1])
-        betaeta1 <- t(t(value[id1,]) - beta1)
+        beta1 <- metabeta(as.matrix(value[id1,]),blist = ins[id1])
+        betaeta1 <- t(t(as.matrix(value[id1,])) - beta1)
         ll1 <- llfun(betaeta1,ins[id1])
       }
-      beta2 <- metabeta(value[id2,],blist = ins[id2])
-      betaeta2 <- t(t(value[id2,]) - beta2)
+      beta2 <- metabeta(as.matrix(value[id2,]),blist = ins[id2])
+      betaeta2 <- t(t(as.matrix(value[id2,])) - beta2)
       ll2 <- llfun(betaeta2,ins[id2])
       maxllj <- c(maxllj,ll1+ll2)
     }
@@ -69,9 +74,11 @@ MMSatScan <- function(id,geo,value,slist,maxsize = NULL,mcmc = 99,replica = F,nc
   xx <- foreach(i = 1:mcmc,.combine = "c",.multicombine = T,
                 .options.snow = opts) %dopar%{
                   set.seed(i)
+                  # betasim <- t(sapply(slist, mvrnorm, n = 1, mu = beta0))
                   repermutaion <- sample(n,n,replace = F)
-                  betasim <- value[repermutaion,]
+                  betasim <- as.matrix(value[repermutaion,])
                   pins <- ins[repermutaion]
+                  #ll0 <- llfun(betasim,ins)
                   maxllsim <- -Inf
                   for (j in 1:n) {
                     orderj <- sort(distance[j,])
@@ -80,12 +87,12 @@ MMSatScan <- function(id,geo,value,slist,maxsize = NULL,mcmc = 99,replica = F,nc
                       id1 <- idj[1:k] # id in cluster
                       id2 <- idj[-(1:k)] # id not in cluster
                       if(k==1) ll1 <- 0 else{
-                        beta1 <- metabeta(betasim[id1,],blist = pins[id1])
-                        betaeta1 <- t(t(betasim[id1,]) - beta1)
+                        beta1 <- metabeta(as.matrix(betasim[id1,]),blist = pins[id1])
+                        betaeta1 <- t(t(as.matrix(betasim[id1,])) - beta1)
                         ll1 <- llfun(betaeta1,pins[id1])
                       }
-                      beta2 <- metabeta(betasim[id2,],blist = pins[id2])
-                      betaeta2 <- t(t(betasim[id2,]) - beta2)
+                      beta2 <- metabeta(as.matrix(betasim[id2,]),blist = pins[id2])
+                      betaeta2 <- t(t(as.matrix(betasim[id2,])) - beta2)
                       ll2 <- llfun(betaeta2,pins[id2])
                       maxllsim <- max(maxllsim,ll1+ll2-ll0)
                     }
@@ -120,6 +127,7 @@ MMSatScan <- function(id,geo,value,slist,maxsize = NULL,mcmc = 99,replica = F,nc
 
 library(doSNOW)
 library(MASS)
+
 
 
 
